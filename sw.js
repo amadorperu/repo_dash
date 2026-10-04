@@ -1,4 +1,4 @@
-const VERSION = "dash-v4";
+const VERSION = "dash-v5";
 const SHELL = ["./", "./index.html", "./config.js", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -15,7 +15,7 @@ self.addEventListener("fetch", e => {
   const save = res => { if (res.ok || res.type === "opaque") { const c = res.clone(); caches.open(VERSION).then(x => x.put(e.request, c)); } return res; };
   if (url.origin === self.location.origin) {
     // Archivos propios: primero la red, así cada cambio en GitHub aparece al abrir.
-    e.respondWith(fetch(e.request).then(save).catch(() => caches.match(e.request).then(r => r || caches.match("./index.html"))));
+    e.respondWith(fetch(e.request.url, { cache: "no-store" }).then(save).catch(() => caches.match(e.request).then(r => r || caches.match("./index.html"))));
   } else {
     // Librerías y fuentes: primero caché.
     e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request).then(save)));
