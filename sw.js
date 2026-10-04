@@ -1,0 +1,31 @@
+// Cambia la versión cada vez que edites index.html para forzar la actualización en el celular.
+const VERSION = "dash-v1";
+const SHELL = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
+
+self.addEventListener("install", e => {
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener("activate", e => {
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", e => {
+  const url = new URL(e.request.url);
+  if (e.request.method !== "GET") return;
+  // Los datos de Google Sheets siempre van a la red; el respaldo offline lo maneja index.html.
+  if (url.hostname.endsWith("google.com") || url.hostname.endsWith("googleusercontent.com")) return;
+  // Resto: primero caché, luego red, y guarda lo nuevo.
+  e.respondWith(
+    caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+      if (res.ok || res.type === "opaque") {
+        const copy = res.clone();
+        caches.open(VERSION).then(c => c.put(e.request, copy));
+      }
+      return res;
+    }).catch(() => caches.match("./index.html")))
+  );
+});

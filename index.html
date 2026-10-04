@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mi Dashboard</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#17252A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --ink:#17252A; --paper:#F2F4F1; --card:#FFFFFF; --line:#DCE2DE;
+  --teal:#2B7A78; --amber:#D9913B; --muted:#6B7C7D; --down:#B4483C;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --nav-h:64px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#101B1E; --card:#17252A; --line:#24363B; --ink:#E8EEEC; --muted:#93A5A6; --teal:#4FB3AF; }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--body); background:var(--paper); color:var(--ink);
+  -webkit-font-smoothing:antialiased; overscroll-behavior-y:contain;
+}
+
+/* Cabecera: el elemento protagonista */
+.hero{
+  background:#17252A; color:#F2F4F1;
+  padding:calc(env(safe-area-inset-top,0px) + 18px) 20px 0;
+  position:relative; overflow:hidden;
+}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.topbar h1{font-family:var(--display);font-weight:500;font-size:1.05rem;letter-spacing:.01em}
+.refresh{
+  background:transparent;border:1px solid rgba(242,244,241,.25);color:#F2F4F1;
+  border-radius:999px;padding:6px 12px;font:500 .8rem var(--body);cursor:pointer;
+  display:flex;align-items:center;gap:6px;
+}
+.refresh:focus-visible,.seg button:focus-visible,.tabs button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.refresh svg{width:14px;height:14px}
+.refresh.spin svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.big{margin-top:22px}
+.big .label{font-size:.85rem;color:#A9BDBC}
+.big .value{font-family:var(--display);font-weight:700;font-size:clamp(2.6rem,12vw,3.6rem);line-height:1.02;letter-spacing:-.02em;margin-top:4px}
+.big .delta{margin-top:8px;font-size:.88rem;color:#CFE3E1}
+.big .delta b{font-weight:600}
+.big .delta .up{color:#7FD1C7}.big .delta .dn{color:#F0A497}
+.spark{height:84px;margin:14px -20px 0}
+.updated{font-size:.75rem;color:#A9BDBC;padding:10px 0 14px}
+
+/* Selector de periodo */
+.seg{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin:16px 16px 0}
+.seg button{flex:1;border:0;background:transparent;color:var(--muted);font:500 .85rem var(--body);padding:8px 0;border-radius:9px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+
+main{padding:0 16px calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 24px);max-width:720px;margin:0 auto}
+.view{display:none}.view.active{display:block}
+
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:16px}
+.stat{background:var(--card);padding:14px}
+.stat .k{font-size:.78rem;color:var(--muted)}
+.stat .v{font-family:var(--display);font-weight:700;font-size:1.45rem;margin-top:4px;font-variant-numeric:tabular-nums}
+.stat .s{font-size:.75rem;color:var(--muted);margin-top:2px}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:16px}
+.panel h2{font-family:var(--display);font-weight:500;font-size:1.05rem}
+.panel p.sub{font-size:.8rem;color:var(--muted);margin-top:2px}
+.chartbox{position:relative;height:220px;margin-top:12px}
+.chartbox.tall{height:260px}
+
+.goal{margin-top:14px}
+.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--amber);border-radius:6px;width:0;transition:width .6s ease}
+.goal .row{display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-top:6px}
+
+.cat-list{list-style:none;margin-top:12px}
+.cat-list li{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 0;border-top:1px solid var(--line);font-size:.92rem}
+.cat-list li:first-child{border-top:0}
+.cat-list .amt{font-variant-numeric:tabular-nums;font-weight:600}
+.cat-list .pct{grid-column:1/-1;height:6px;background:var(--line);border-radius:4px;overflow:hidden}
+.cat-list .pct i{display:block;height:100%;background:var(--teal)}
+
+.search{width:100%;margin-top:16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font:400 .95rem var(--body)}
+.rows{list-style:none;margin-top:8px}
+.rows li{display:flex;justify-content:space-between;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line)}
+.rows .d{font-size:.78rem;color:var(--muted)}
+.rows .c{font-size:.95rem}
+.rows .m{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.empty{padding:28px 8px;text-align:center;color:var(--muted);font-size:.9rem}
+
+.notice{margin-top:16px;padding:12px 14px;border-radius:12px;background:rgba(217,145,59,.12);border:1px solid rgba(217,145,59,.35);font-size:.85rem;line-height:1.45}
+.notice code{font-size:.8rem}
+
+/* Barra de pestañas inferior tipo app */
+.tabs{
+  position:fixed;left:0;right:0;bottom:0;z-index:10;
+  display:flex;background:var(--card);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.tabs button{flex:1;height:var(--nav-h);border:0;background:transparent;color:var(--muted);font:500 .75rem var(--body);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+.tabs button svg{width:22px;height:22px}
+.tabs button[aria-selected="true"]{color:var(--teal)}
+
+@media (min-width:720px){ .stats{grid-template-columns:repeat(4,1fr)} }
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="topbar">
+    <h1 id="appTitle">Mi Dashboard</h1>
+    <button class="refresh" id="refreshBtn" aria-label="Actualizar datos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+      Actualizar
+    </button>
+  </div>
+  <div class="big">
+    <div class="label" id="bigLabel">Total del periodo</div>
+    <div class="value" id="bigValue">—</div>
+    <div class="delta" id="bigDelta">&nbsp;</div>
+  </div>
+  <div class="spark"><canvas id="spark" aria-hidden="true"></canvas></div>
+  <div class="updated" id="updated">Cargando datos…</div>
+</header>
+
+<div class="seg" role="group" aria-label="Periodo">
+  <button data-days="7">7 días</button>
+  <button data-days="30" aria-pressed="true">30 días</button>
+  <button data-days="90">90 días</button>
+  <button data-days="0">Todo</button>
+</div>
+
+<main>
+  <div id="notice"></div>
+
+  <section class="view active" id="view-resumen">
+    <div class="stats">
+      <div class="stat"><div class="k">Registros</div><div class="v" id="sCount">—</div><div class="s">en el periodo</div></div>
+      <div class="stat"><div class="k">Promedio diario</div><div class="v" id="sAvg">—</div><div class="s">monto por día</div></div>
+      <div class="stat"><div class="k">Mejor día</div><div class="v" id="sBest">—</div><div class="s" id="sBestDate">&nbsp;</div></div>
+      <div class="stat"><div class="k">Categoría líder</div><div class="v" id="sTop" style="font-size:1.1rem">—</div><div class="s" id="sTopShare">&nbsp;</div></div>
+    </div>
+
+    <div class="panel">
+      <h2>Avance contra la meta</h2>
+      <p class="sub">Suma de la columna meta en el periodo</p>
+      <div class="goal">
+        <div class="bar"><i id="goalBar"></i></div>
+        <div class="row"><span id="goalPct">—</span><span id="goalTxt">—</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Evolución diaria</h2>
+      <p class="sub">Monto por día</p>
+      <div class="chartbox"><canvas id="lineChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-categorias">
+    <div class="panel">
+      <h2>Distribución por categoría</h2>
+      <p class="sub">Participación sobre el total del periodo</p>
+      <div class="chartbox tall"><canvas id="donutChart"></canvas></div>
+      <ul class="cat-list" id="catList"></ul>
+    </div>
+  </section>
+
+  <section class="view" id="view-registros">
+    <input class="search" id="search" type="search" placeholder="Buscar por categoría o detalle" aria-label="Buscar registros">
+    <ul class="rows" id="rows"></ul>
+  </section>
+</main>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-view="resumen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg>Resumen</button>
+  <button role="tab" aria-selected="false" data-view="categorias">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4"/></svg>Categorías</button>
+  <button role="tab" aria-selected="false" data-view="registros">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Registros</button>
+</nav>
+
+<script>
+/* =========================================================
+   CONFIGURACIÓN: edita solo este bloque
+   ========================================================= */
+const CONFIG = {
+  titulo: "Mi Dashboard",
+  // Pega aquí el enlace CSV de tu Google Sheet publicada.
+  // Vacío = el dashboard muestra datos de ejemplo.
+  sheetCsvUrl: "",
+  moneda: "PEN",          // PEN, USD, EUR...
+  locale: "es-PE",
+  periodoInicial: 30      // 7, 30, 90 o 0 (todo)
+};
+/* ========================================================= */
+
+const $ = id => document.getElementById(id);
+const fmtMoney = n => new Intl.NumberFormat(CONFIG.locale,{style:"currency",currency:CONFIG.moneda,maximumFractionDigits:0}).format(n);
+const fmtShort = n => new Intl.NumberFormat(CONFIG.locale,{notation:"compact",maximumFractionDigits:1}).format(n);
+const fmtDate = d => d.toLocaleDateString(CONFIG.locale,{day:"numeric",month:"short"});
+const dayKey = d => d.toISOString().slice(0,10);
+const PALETTE = ["#2B7A78","#D9913B","#17252A","#7FB7B4","#B4483C","#8A9A9B","#E6C38F","#4A6670"];
+
+let DATA = [], days = CONFIG.periodoInicial, charts = {};
+$("appTitle").textContent = CONFIG.titulo; document.title = CONFIG.titulo;
+
+/* ---------- Lectura de CSV ---------- */
+function parseCSV(text){
+  const rows=[]; let row=[], cell="", q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cell+='"';i++} else q=false } else cell+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(cell); cell=""; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(cell); rows.push(row); row=[]; cell=""; }
+    else cell+=c;
+  }
+  if(cell||row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(r=>r.some(x=>x.trim()!==""));
+}
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+function parseDate(s){
+  s=s.trim(); let m;
+  if(m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)) return new Date(Date.UTC(+m[1],m[2]-1,+m[3]));
+  if(m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)) return new Date(Date.UTC(+m[3],m[2]-1,+m[1]));
+  return null;
+}
+function parseNum(s){
+  if(!s) return 0;
+  s=String(s).replace(/[^\d,.\-]/g,"");
+  if(s.includes(",")&&s.includes(".")) s = s.lastIndexOf(",")>s.lastIndexOf(".") ? s.replace(/\./g,"").replace(",",".") : s.replace(/,/g,"");
+  else if(s.includes(",")) s = /,\d{1,2}$/.test(s) ? s.replace(",",".") : s.replace(/,/g,"");
+  return parseFloat(s)||0;
+}
+function rowsToData(rows){
+  const h=rows[0].map(norm);
+  const idx=k=>h.findIndex(x=>x===k);
+  const iF=idx("fecha"), iC=idx("categoria"), iM=idx("monto"), iMe=idx("meta"), iD=idx("detalle");
+  if(iF<0||iC<0||iM<0) throw new Error("La hoja necesita las columnas fecha, categoria y monto en la primera fila.");
+  return rows.slice(1).map(r=>({
+    fecha:parseDate(r[iF]||""), categoria:(r[iC]||"Sin categoría").trim(),
+    monto:parseNum(r[iM]), meta:iMe>=0?parseNum(r[iMe]):0, detalle:iD>=0?(r[iD]||"").trim():""
+  })).filter(x=>x.fecha);
+}
+
+/* ---------- Datos de ejemplo ---------- */
+function demoData(){
+  const cats=["Programas abiertos","In Company","Diplomados","Consultoría","Talleres"];
+  const w=[1.0,1.6,0.8,0.6,0.4], out=[], today=new Date();
+  let seed=7; const rnd=()=>(seed=(seed*9301+49297)%233280)/233280;
+  for(let d=119; d>=0; d--){
+    const dt=new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()-d));
+    const n=1+Math.floor(rnd()*3);
+    for(let k=0;k<n;k++){
+      const ci=Math.floor(rnd()*cats.length);
+      const base=1800*w[ci]*(1+0.35*Math.sin(d/9))*(0.6+rnd()*0.9);
+      out.push({fecha:dt,categoria:cats[ci],monto:Math.round(base),meta:Math.round(2200*w[ci]),detalle:"Registro de ejemplo"});
+    }
+  }
+  return out;
+}
+
+/* ---------- Carga ---------- */
+async function load(){
+  const btn=$("refreshBtn"); btn.classList.add("spin");
+  $("notice").innerHTML="";
+  try{
+    if(!CONFIG.sheetCsvUrl){
+      DATA=demoData();
+      $("notice").innerHTML=`<div class="notice">Estás viendo datos de ejemplo. Pega el enlace CSV de tu Google Sheet en <code>sheetCsvUrl</code> dentro de index.html.</div>`;
+      $("updated").textContent="Datos de ejemplo";
+    }else{
+      const url=CONFIG.sheetCsvUrl+(CONFIG.sheetCsvUrl.includes("?")?"&":"?")+"t="+Date.now();
+      const res=await fetch(url,{cache:"no-store"});
+      if(!res.ok) throw new Error("La hoja respondió con error "+res.status+". Revisa que esté publicada como CSV.");
+      const text=await res.text();
+      DATA=rowsToData(parseCSV(text));
+      try{ localStorage.setItem("dash-cache",JSON.stringify({text,at:Date.now()})); }catch(e){}
+      $("updated").textContent="Actualizado "+new Date().toLocaleTimeString(CONFIG.locale,{hour:"2-digit",minute:"2-digit"});
+    }
+  }catch(err){
+    let cached=null; try{ cached=JSON.parse(localStorage.getItem("dash-cache")); }catch(e){}
+    if(cached){
+      DATA=rowsToData(parseCSV(cached.text));
+      $("updated").textContent="Sin conexión. Datos del "+new Date(cached.at).toLocaleString(CONFIG.locale,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+    }else{
+      DATA=[]; $("updated").textContent="Sin datos";
+    }
+    $("notice").innerHTML=`<div class="notice">${err.message}</div>`;
+  }
+  btn.classList.remove("spin");
+  render();
+}
+
+/* ---------- Cálculos y render ---------- */
+function filterPeriod(arr,d,offset=0){
+  if(!arr.length) return [];
+  if(!d) return offset?[]:arr;
+  const max=Math.max(...arr.map(x=>x.fecha.getTime()));
+  const end=max-offset*d*864e5, start=end-(d-1)*864e5;
+  return arr.filter(x=>{const t=x.fecha.getTime(); return t>=start&&t<=end;});
+}
+function byDay(arr){
+  const m=new Map(); arr.forEach(x=>{const k=dayKey(x.fecha); m.set(k,(m.get(k)||0)+x.monto);});
+  return [...m.entries()].sort((a,b)=>a[0]<b[0]?-1:1);
+}
+function byCat(arr){
+  const m=new Map(); arr.forEach(x=>m.set(x.categoria,(m.get(x.categoria)||0)+x.monto));
+  return [...m.entries()].sort((a,b)=>b[1]-a[1]);
+}
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+function render(){
+  const cur=filterPeriod(DATA,days), prev=filterPeriod(DATA,days,1);
+  const total=cur.reduce((s,x)=>s+x.monto,0), prevTotal=prev.reduce((s,x)=>s+x.monto,0);
+  const daily=byDay(cur), cats=byCat(cur);
+
+  $("bigLabel").textContent = days ? `Total de los últimos ${days} días` : "Total acumulado";
+  $("bigValue").textContent = fmtMoney(total);
+  if(days && prevTotal){
+    const ch=(total-prevTotal)/prevTotal*100;
+    $("bigDelta").innerHTML = `<b class="${ch>=0?"up":"dn"}">${ch>=0?"▲":"▼"} ${Math.abs(ch).toFixed(1)}%</b> frente a los ${days} días anteriores`;
+  } else $("bigDelta").innerHTML="&nbsp;";
+
+  $("sCount").textContent = cur.length.toLocaleString(CONFIG.locale);
+  $("sAvg").textContent = daily.length ? fmtShort(total/daily.length) : "—";
+  const best = daily.reduce((b,x)=>x[1]>b[1]?x:b,["",0]);
+  $("sBest").textContent = best[0]?fmtShort(best[1]):"—";
+  $("sBestDate").textContent = best[0]?fmtDate(new Date(best[0]+"T12:00:00Z")):"\u00a0";
+  $("sTop").textContent = cats[0]?cats[0][0]:"—";
+  $("sTopShare").textContent = cats[0]&&total?`${(cats[0][1]/total*100).toFixed(0)}% del total`:"\u00a0";
+
+  const meta=cur.reduce((s,x)=>s+x.meta,0);
+  const pct = meta ? total/meta*100 : 0;
+  $("goalBar").style.width = Math.min(pct,100)+"%";
+  $("goalPct").textContent = meta ? pct.toFixed(0)+"% de la meta" : "Agrega la columna meta para ver el avance";
+  $("goalTxt").textContent = meta ? `${fmtShort(total)} / ${fmtShort(meta)}` : "";
+
+  drawCharts(daily,cats,total);
+  renderRows();
+}
+
+function drawCharts(daily,cats,total){
+  if(typeof Chart==="undefined") return;
+  Object.values(charts).forEach(c=>c.destroy());
+  const ink=cssVar("--ink"), muted=cssVar("--muted"), line=cssVar("--line"), teal=cssVar("--teal");
+  Chart.defaults.font.family=getComputedStyle(document.body).fontFamily;
+  Chart.defaults.color=muted;
+  const labels=daily.map(d=>fmtDate(new Date(d[0]+"T12:00:00Z"))), vals=daily.map(d=>d[1]);
+
+  charts.spark=new Chart($("spark"),{type:"line",
+    data:{labels,datasets:[{data:vals,borderColor:"#7FD1C7",borderWidth:2,pointRadius:0,tension:.35,fill:true,
+      backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,84);g.addColorStop(0,"rgba(127,209,199,.35)");g.addColorStop(1,"rgba(127,209,199,0)");return g;}}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{x:{display:false},y:{display:false}},layout:{padding:0}}});
+
+  charts.line=new Chart($("lineChart"),{type:"bar",
+    data:{labels,datasets:[{data:vals,backgroundColor:teal,borderRadius:3,maxBarThickness:18}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>fmtMoney(c.parsed.y)}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:6,maxRotation:0}},
+              y:{grid:{color:line},border:{display:false},ticks:{callback:v=>fmtShort(v),maxTicksLimit:5}}}}});
+
+  charts.donut=new Chart($("donutChart"),{type:"doughnut",
+    data:{labels:cats.map(c=>c[0]),datasets:[{data:cats.map(c=>c[1]),backgroundColor:PALETTE,borderColor:cssVar("--card"),borderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:"68%",plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>`${c.label}: ${fmtMoney(c.parsed)}`}}}}});
+
+  $("catList").innerHTML = cats.map((c,i)=>{
+    const p=total?c[1]/total*100:0;
+    return `<li><span>${esc(c[0])}</span><span class="amt">${fmtMoney(c[1])}</span>
+      <span class="pct"><i style="width:${p}%;background:${PALETTE[i%PALETTE.length]}"></i></span></li>`;
+  }).join("") || `<li class="empty">No hay registros en este periodo.</li>`;
+}
+
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+function renderRows(){
+  const q=norm($("search").value||"");
+  const list=filterPeriod(DATA,days).slice().sort((a,b)=>b.fecha-a.fecha)
+    .filter(x=>!q||norm(x.categoria+" "+x.detalle).includes(q)).slice(0,200);
+  $("rows").innerHTML = list.map(x=>`<li><div><div class="c">${esc(x.categoria)}</div>
+    <div class="d">${fmtDate(x.fecha)}${x.detalle?", "+esc(x.detalle):""}</div></div>
+    <div class="m">${fmtMoney(x.monto)}</div></li>`).join("")
+    || `<li class="empty">No hay registros que coincidan. Cambia el periodo o la búsqueda.</li>`;
+}
+
+/* ---------- Interacción ---------- */
+document.querySelectorAll(".seg button").forEach(b=>{
+  b.setAttribute("aria-pressed", String(+b.dataset.days===days));
+  b.onclick=()=>{ days=+b.dataset.days;
+    document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+    render(); };
+});
+document.querySelectorAll(".tabs button").forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",String(x===b)));
+    document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+b.dataset.view));
+    window.scrollTo({top:0});
+    Object.values(charts).forEach(c=>c.resize());
+  };
+});
+$("search").addEventListener("input",renderRows);
+$("refreshBtn").onclick=load;
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&CONFIG.sheetCsvUrl) load(); });
+
+if("serviceWorker" in navigator){ window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{})); }
+load();
+</script>
+</body>
+</html>
