@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dashboard de Ventas</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#5A1EF5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ventas">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  --violet:#5A1EF5; --magenta:#FF2D87; --orange:#FF7A1A; --yellow:#FFC21A;
+  --cyan:#00B8D9; --green:#0FBF73; --blue:#2F6BFF; --red:#FF3B4E;
+  --bg:#F4F1FF; --card:#FFFFFF; --ink:#1A1238; --muted:#6E678C; --line:#E6E0FA;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --nav-h:64px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0E0A24; --card:#18123A; --ink:#F2EEFF; --muted:#A39BC8; --line:#2A2257; }
+  .kpi .v{filter:brightness(1.4) saturate(1.1)}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;overscroll-behavior-y:contain}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+
+/* Cabecera */
+.hero{background:var(--violet);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 16px) 20px 0;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;width:260px;height:260px;border-radius:50%;background:var(--magenta);right:-90px;top:-110px;opacity:.9}
+.hero > *{position:relative;z-index:1}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.topbar h1{font-family:var(--display);font-weight:700;font-size:1.05rem}
+.refresh{background:rgba(255,255,255,.16);border:0;color:#fff;border-radius:999px;padding:7px 13px;font-weight:500;font-size:.8rem;display:flex;align-items:center;gap:6px;cursor:pointer}
+.refresh svg{width:14px;height:14px}
+.refresh.spin svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.big{margin-top:20px}
+.big .label{font-size:.85rem;color:#DCD2FF}
+.big .value{font-family:var(--display);font-weight:800;font-size:clamp(2.5rem,11.5vw,3.6rem);line-height:1.02;letter-spacing:-.02em;margin-top:4px}
+.big .sub{margin-top:8px;font-size:.88rem;color:#EDE7FF;display:flex;flex-wrap:wrap;gap:6px 14px}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-weight:600;font-size:.8rem}
+.pill.up{background:#C8FFE4;color:#04633A}.pill.dn{background:#FFD3D8;color:#9A0F22}
+.spark{height:80px;margin:12px -20px 0}
+.updated{font-size:.75rem;color:#DCD2FF;padding:8px 0 14px}
+
+/* Filtros */
+.filters{display:flex;gap:8px;overflow-x:auto;padding:14px 16px 4px;scrollbar-width:none;max-width:1100px;margin:0 auto}
+.filters::-webkit-scrollbar{display:none}
+.filters select{appearance:none;-webkit-appearance:none;flex:0 0 auto;border:2px solid var(--line);background:var(--card);border-radius:999px;padding:8px 30px 8px 14px;font-size:.85rem;font-weight:500;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236E678C' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center}
+.filters select.on{border-color:var(--violet);background-color:var(--violet);color:#fff;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")}
+.filters .clear{flex:0 0 auto;border:0;background:var(--magenta);color:#fff;border-radius:999px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer}
+
+main{padding:0 16px calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 24px);max-width:1100px;margin:0 auto}
+.view{display:none}.view.active{display:block}
+.grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px}
+@media (min-width:900px){ .grid{grid-template-columns:1fr 1fr} .grid .wide{grid-column:1/-1} }
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+@media (min-width:900px){ .kpis{grid-template-columns:repeat(4,1fr)} }
+.kpi{background:var(--card);border-radius:16px;padding:14px;position:relative;overflow:hidden;border:1px solid var(--line)}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c)}
+.kpi .k{font-size:.78rem;color:var(--muted);font-weight:500}
+.kpi .v{font-family:var(--display);font-weight:800;font-size:1.3rem;margin-top:4px;color:var(--c);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .s{font-size:.74rem;color:var(--muted);margin-top:2px}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
+.panel h2{font-family:var(--display);font-weight:700;font-size:1.05rem}
+.panel .sub{font-size:.8rem;color:var(--muted);margin-top:2px}
+.box{position:relative;height:240px;margin-top:12px}
+.box.tall{height:300px}.box.xl{height:340px}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font-size:.8rem}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.quad div{border-radius:12px;padding:10px;font-size:.8rem;color:#fff}
+.quad b{display:block;font-family:var(--display);font-size:.95rem}
+.q-star{background:var(--orange)}.q-int{background:var(--blue)}.q-cow{background:var(--green)}.q-dog{background:var(--magenta)}
+
+.search{width:100%;margin-top:14px;padding:12px 14px;border:2px solid var(--line);border-radius:14px;background:var(--card);font-size:.95rem}
+.rows{list-style:none;margin-top:8px}
+.rows li{display:flex;justify-content:space-between;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line)}
+.rows .t{font-weight:600;font-size:.95rem}
+.rows .d{font-size:.78rem;color:var(--muted);margin-top:2px}
+.rows .r{text-align:right;white-space:nowrap}
+.rows .m{font-weight:700;font-variant-numeric:tabular-nums}
+.rows .u{font-size:.8rem;font-weight:600;margin-top:2px}
+.pos{color:var(--green)}.neg{color:var(--red)}
+.count{font-size:.8rem;color:var(--muted);margin-top:10px}
+.empty{padding:28px 8px;text-align:center;color:var(--muted);font-size:.9rem}
+.notice{margin-top:14px;padding:12px 14px;border-radius:14px;background:#FFF3D1;color:#5C4300;border:2px solid var(--yellow);font-size:.85rem;line-height:1.45}
+.notice code{font-size:.8rem}
+
+/* Barra inferior */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs button{flex:1;height:var(--nav-h);border:0;background:transparent;color:var(--muted);font-weight:500;font-size:.72rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+.tabs svg{width:22px;height:22px}
+.tabs button[aria-selected="true"]{color:var(--violet)}
+@media (prefers-color-scheme: dark){ .tabs button[aria-selected="true"]{color:#B79CFF} }
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="topbar">
+    <h1 id="appTitle">Dashboard de Ventas</h1>
+    <button class="refresh" id="refreshBtn" aria-label="Actualizar datos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Actualizar</button>
+  </div>
+  <div class="big">
+    <div class="label" id="bigLabel">Ventas totales</div>
+    <div class="value" id="bigValue">—</div>
+    <div class="sub" id="bigSub">&nbsp;</div>
+  </div>
+  <div class="spark"><canvas id="spark" aria-hidden="true"></canvas></div>
+  <div class="updated" id="updated">Cargando datos…</div>
+</header>
+
+<div class="filters" role="group" aria-label="Filtros">
+  <select id="f-anio" aria-label="Año"></select>
+  <select id="f-categoria" aria-label="Categoría"></select>
+  <select id="f-producto" aria-label="Producto"></select>
+  <select id="f-region" aria-label="Región"></select>
+  <button class="clear" id="clearBtn" hidden>Quitar filtros</button>
+</div>
+
+<main>
+  <div id="notice"></div>
+
+  <section class="view active" id="view-resumen">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid">
+      <div class="panel wide"><h2>Evolución mensual</h2><p class="sub">Ventas y utilidad por mes</p><div class="box"><canvas id="cTendencia"></canvas></div></div>
+      <div class="panel"><h2>Comparativo mensual</h2><p class="sub">Ventas, costo y utilidad</p><div class="box tall"><canvas id="cComparativo"></canvas></div></div>
+      <div class="panel"><h2>Estructura financiera</h2><p class="sub">Cómo se reparte cada sol vendido</p><div class="box"><canvas id="cEstructura"></canvas></div><div class="legend" id="lEstructura"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-productos">
+    <div class="grid">
+      <div class="panel"><h2>Top 10 productos</h2><p class="sub">Ranking por ventas</p><div class="box tall"><canvas id="cProductos"></canvas></div></div>
+      <div class="panel"><h2>Ventas por categoría</h2><p class="sub">Participación en el total</p><div class="box"><canvas id="cCategorias"></canvas></div><div class="legend" id="lCategorias"></div></div>
+      <div class="panel wide"><h2>Matriz BCG</h2><p class="sub" id="bcgSub">Crecimiento anual frente a participación relativa</p><div class="box xl"><canvas id="cBCG"></canvas></div>
+        <div class="quad"><div class="q-star"><b>Estrellas</b>Alto crecimiento, alta participación</div><div class="q-int"><b>Interrogantes</b>Alto crecimiento, baja participación</div><div class="q-cow"><b>Vacas lecheras</b>Bajo crecimiento, alta participación</div><div class="q-dog"><b>Perros</b>Bajo crecimiento, baja participación</div></div></div>
+      <div class="panel"><h2>Rentabilidad por producto</h2><p class="sub">% margen frente a % utilidad. Tamaño según ventas</p><div class="box xl"><canvas id="cRentabilidad"></canvas></div></div>
+      <div class="panel"><h2>Radar por categoría</h2><p class="sub">Indicadores normalizados de 0 a 100</p><div class="box xl"><canvas id="cRadar"></canvas></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-mercado">
+    <div class="grid">
+      <div class="panel"><h2>Top 10 regiones</h2><p class="sub">Ventas por región</p><div class="box tall"><canvas id="cRegiones"></canvas></div></div>
+      <div class="panel"><h2>Top 10 empresas</h2><p class="sub">Clientes con más ventas</p><div class="box tall"><canvas id="cEmpresas"></canvas></div></div>
+      <div class="panel"><h2>Ventas frente a utilidad</h2><p class="sub">Cada punto es una operación</p><div class="box tall"><canvas id="cDispersion"></canvas></div></div>
+      <div class="panel"><h2>Campana de Gauss</h2><p class="sub" id="gaussSub">Distribución del monto por operación</p><div class="box tall"><canvas id="cGauss"></canvas></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-registros">
+    <input class="search" id="search" type="search" placeholder="Buscar empresa, producto o región" aria-label="Buscar operaciones">
+    <p class="count" id="count"></p>
+    <ul class="rows" id="rows"></ul>
+  </section>
+</main>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-view="resumen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg>Resumen</button>
+  <button role="tab" aria-selected="false" data-view="productos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/></svg>Productos</button>
+  <button role="tab" aria-selected="false" data-view="mercado"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Mercado</button>
+  <button role="tab" aria-selected="false" data-view="registros"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Operaciones</button>
+</nav>
+
+<script>
+const CFG = Object.assign({titulo:"Dashboard de Ventas", sheetCsvUrl:"", moneda:"PEN", locale:"es-PE"}, window.DASH_CONFIG || {});
+const $ = id => document.getElementById(id);
+const PAL = ["#5A1EF5","#FF2D87","#FF7A1A","#00B8D9","#0FBF73","#FFC21A","#2F6BFF","#FF3B4E","#B620E0","#00C9A7","#FF9F1C","#3A86FF"];
+const MES = ["ene","feb","mar","abr","may","jun","jul","ago","set","oct","nov","dic"];
+const money = n => new Intl.NumberFormat(CFG.locale,{style:"currency",currency:CFG.moneda,maximumFractionDigits:0}).format(n);
+const short = n => new Intl.NumberFormat(CFG.locale,{notation:"compact",maximumFractionDigits:1}).format(n);
+const pct = n => (isFinite(n)?n:0).toFixed(1)+"%";
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const mLabel = k => MES[+k.slice(5,7)-1]+" "+k.slice(2,4);
+const sum = (a,f) => a.reduce((s,x)=>s+f(x),0);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+let RAW=[], DATA=[], charts={}, current="resumen", dirty=new Set();
+const F={anio:"",categoria:"",producto:"",region:""};
+$("appTitle").textContent=CFG.titulo; document.title=CFG.titulo;
+
+/* ================= Lectura de datos ================= */
+function parseCSV(t){
+  const rows=[];let row=[],cell="",q=false;
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){ if(c==='"'){ if(t[i+1]==='"'){cell+='"';i++} else q=false } else cell+=c; }
+    else if(c==='"') q=true; else if(c===','){row.push(cell);cell=""}
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&t[i+1]==='\n')i++; row.push(cell);rows.push(row);row=[];cell=""; }
+    else cell+=c; }
+  if(cell||row.length){row.push(cell);rows.push(row)}
+  return rows.filter(r=>r.some(x=>x.trim()!==""));
+}
+function parseNum(v){
+  if(v==null) return 0; let s=String(v).trim(); if(!s) return 0;
+  s=s.replace(/S\/\.?/gi,"").replace(/[$€%\s]/g,"");
+  const first=s.search(/\d/); if(first<0) return 0;
+  const neg=/[-(]/.test(s.slice(0,first));
+  s=s.slice(first).replace(/[^\d,.]/g,"");
+  if(s.includes(",")&&s.includes(".")) s = s.lastIndexOf(",")>s.lastIndexOf(".") ? s.replace(/\./g,"").replace(",",".") : s.replace(/,/g,"");
+  else if(s.includes(",")) s = /,\d{1,2}$/.test(s) ? s.replace(",",".") : s.replace(/,/g,"");
+  const n=parseFloat(s)||0; return neg?-n:n;
+}
+function parseDate(s){
+  s=String(s||"").trim(); let m;
+  if(m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)) return new Date(Date.UTC(+m[1],m[2]-1,+m[3]));
+  if(m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)) return new Date(Date.UTC(+m[3],m[2]-1,+m[1]));
+  return null;
+}
+const normH = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\(.*?\)/g,"").replace(/\s+/g," ").trim();
+const FIELDS = {
+  fecha:["fecha","date"], empresa:["nombre de la empresa","empresa","cliente","razon social"],
+  producto:["producto","product"], categoria:["categoria","category","linea"],
+  region:["region","departamento","zona","ciudad"], ventas:["ventas","venta","venta total","importe","total"],
+  costo:["costo","costos"], margen:["margen","margen bruto"], gastos:["gastos","gasto"],
+  utilidad:["utilidad","utilidad neta","ganancia"], pMargen:["% margen","margen %"], pUtilidad:["% utilidad","utilidad %"]
+};
+function mapColumns(header){
+  const h=header.map(normH), used=new Set(), col={};
+  for(const k in FIELDS){ const i=h.findIndex((x,j)=>!used.has(j)&&FIELDS[k].includes(x)); if(i>=0){col[k]=i;used.add(i)} }
+  for(const k in FIELDS){ if(col[k]!=null) continue; const isP=k.startsWith("p");
+    const i=h.findIndex((x,j)=>!used.has(j)&&(isP===x.includes("%"))&&FIELDS[k].some(s=>x.includes(s.replace("% ",""))));
+    if(i>=0){col[k]=i;used.add(i)} }
+  return col;
+}
+function rowsToData(rows){
+  const col=mapColumns(rows[0]);
+  const falta=["fecha","ventas"].filter(k=>col[k]==null);
+  if(falta.length) throw new Error(`No encontré la columna de ${falta.join(" y ")}. Encabezados leídos: ${rows[0].filter(x=>x.trim()).join(", ")}.`);
+  const g=(r,k)=>col[k]!=null?(r[col[k]]||"").trim():"";
+  return rows.slice(1).map((r,ri)=>{
+    const f=parseDate(g(r,"fecha")); if(!f) return null;
+    const ventas=parseNum(g(r,"ventas")), costo=parseNum(g(r,"costo")), gastos=parseNum(g(r,"gastos"));
+    const margen=col.margen!=null?parseNum(g(r,"margen")):ventas-costo;
+    const utilidad=col.utilidad!=null?parseNum(g(r,"utilidad")):margen-gastos;
+    const iso=f.toISOString();
+    return { fila:ri+2, f, fecha:iso.slice(0,10), anio:iso.slice(0,4), mes:iso.slice(0,7),
+      empresa:g(r,"empresa")||"Sin empresa", producto:g(r,"producto")||"Sin producto",
+      categoria:g(r,"categoria")||"Sin categoría", region:g(r,"region")||"Sin región",
+      ventas, costo, gastos, margen, utilidad,
+      pm: col.pMargen!=null?parseNum(g(r,"pMargen")):(ventas?margen/ventas*100:0),
+      pu: col.pUtilidad!=null?parseNum(g(r,"pUtilidad")):(ventas?utilidad/ventas*100:0) };
+  }).filter(Boolean);
+}
+function demoData(){
+  const prods=[["Membretados","Papelería"],["Tarjetas de presentación","Papelería"],["Fundas para celular","Accesorios"],["Alfombrillas de mouse","Accesorios"],["Polos","Indumentaria"],["Poleras con capucha","Indumentaria"]];
+  const emps=["Gadget Galaxy","TechGiant Outlet","ElectroHub","Digital Dreams","Circuit City Central"];
+  const regs=["Lima","Arequipa","Cusco","Piura","La Libertad","Lambayeque","Junín","Puno","Ica","Callao"];
+  let seed=11; const rnd=()=>(seed=(seed*9301+49297)%233280)/233280; const out=[];
+  for(let d=0; d<730; d++){
+    const f=new Date(Date.UTC(2023,0,1+d)), [p,c]=prods[Math.floor(rnd()*prods.length)];
+    const ventas=Math.round(150+rnd()*150*(f.getUTCFullYear()===2024&&c!=="Papelería"?1.25:1)), costo=Math.round(55+rnd()*65), gastos=Math.round(50+rnd()*30);
+    const iso=f.toISOString(), margen=ventas-costo, utilidad=margen-gastos;
+    out.push({f,fecha:iso.slice(0,10),anio:iso.slice(0,4),mes:iso.slice(0,7),empresa:emps[Math.floor(rnd()*emps.length)],producto:p,categoria:c,
+      region:regs[Math.floor(rnd()*regs.length)],ventas,costo,gastos,margen,utilidad,pm:margen/ventas*100,pu:utilidad/ventas*100});
+  }
+  return out;
+}
+
+async function load(){
+  $("refreshBtn").classList.add("spin"); $("notice").innerHTML="";
+  try{
+    if(!CFG.sheetCsvUrl){
+      RAW=demoData(); $("updated").textContent="Datos de ejemplo";
+      $("notice").innerHTML=`<div class="notice">Estás viendo datos de ejemplo. Pega el enlace CSV de tu hoja en <code>sheetCsvUrl</code> dentro de config.js.</div>`;
+    } else {
+      const u=CFG.sheetCsvUrl+(CFG.sheetCsvUrl.includes("?")?"&":"?")+"t="+Date.now();
+      const res=await fetch(u,{cache:"no-store"});
+      if(!res.ok) throw new Error("La hoja respondió con error "+res.status+". Revisa que siga publicada como CSV.");
+      const text=await res.text(); RAW=rowsToData(parseCSV(text));
+      try{localStorage.setItem("dash-cache-v2",JSON.stringify({text,at:Date.now()}))}catch(e){}
+      $("updated").textContent=`Actualizado ${new Date().toLocaleTimeString(CFG.locale,{hour:"2-digit",minute:"2-digit"})}, ${RAW.length.toLocaleString(CFG.locale)} registros`;
+    }
+  }catch(err){
+    let c=null; try{c=JSON.parse(localStorage.getItem("dash-cache-v2"))}catch(e){}
+    if(c){ try{RAW=rowsToData(parseCSV(c.text))}catch(e){RAW=[]}
+      $("updated").textContent="Sin conexión. Datos del "+new Date(c.at).toLocaleString(CFG.locale,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }
+    else { RAW=[]; $("updated").textContent="Sin datos"; }
+    $("notice").innerHTML=`<div class="notice">${esc(err.message)}</div>`;
+  }
+  $("refreshBtn").classList.remove("spin");
+  flagOutliers(); fillFilters(); apply();
+}
+
+function flagOutliers(){
+  const v=RAW.map(d=>d.ventas).sort((a,b)=>a-b); if(v.length<20) return;
+  const q=p=>v[Math.floor(p*(v.length-1))], hi=q(.75)+3*(q(.75)-q(.25));
+  const out=RAW.filter(d=>d.ventas>hi).sort((a,b)=>b.ventas-a.ventas);
+  if(!out.length) return;
+  const items=out.slice(0,3).map(d=>`fila ${d.fila ?? "?"} (${d.fecha}, ${esc(d.empresa)}, ${esc(d.producto)}): ${money(d.ventas)}`).join("; ");
+  $("notice").innerHTML+=`<div class="notice">Hay ${out.length} venta${out.length>1?"s":""} muy por encima del resto que distorsiona${out.length>1?"n":""} los totales y gráficos: ${items}${out.length>3?" y otras":""}. Revisa ${out.length>1?"esos valores":"ese valor"} en la hoja.</div>`;
+}
+
+/* ================= Filtros ================= */
+const FMAP={anio:["f-anio","Año","Todos los años"],categoria:["f-categoria","Categoría","Todas las categorías"],producto:["f-producto","Producto","Todos los productos"],region:["f-region","Región","Todas las regiones"]};
+function fillFilters(){
+  for(const k in FMAP){
+    const [id,,all]=FMAP[k], vals=[...new Set(RAW.map(d=>d[k]))].sort((a,b)=>String(a).localeCompare(String(b),"es"));
+    if(!vals.includes(F[k])) F[k]="";
+    $(id).innerHTML=`<option value="">${all}</option>`+vals.map(v=>`<option${v===F[k]?" selected":""}>${esc(v)}</option>`).join("");
+  }
+}
+function apply(){
+  DATA=RAW.filter(d=>Object.keys(F).every(k=>!F[k]||d[k]===F[k]));
+  for(const k in FMAP) $(FMAP[k][0]).classList.toggle("on",!!F[k]);
+  $("clearBtn").hidden=!Object.values(F).some(Boolean);
+  renderHero(); dirty=new Set(["resumen","productos","mercado","registros"]); renderView(current);
+}
+for(const k in FMAP) $(FMAP[k][0]).addEventListener("change",e=>{F[k]=e.target.value;apply()});
+$("clearBtn").onclick=()=>{for(const k in F)F[k]="";fillFilters();apply()};
+
+/* ================= Utilidades de gráficos ================= */
+function chart(id,cfg){ if(charts[id]) charts[id].destroy(); if(typeof Chart==="undefined") return; charts[id]=new Chart($(id),cfg); }
+function setDefaults(){
+  if(typeof Chart==="undefined") return;
+  Chart.defaults.font.family=getComputedStyle(document.body).fontFamily;
+  Chart.defaults.color=css("--muted"); Chart.defaults.borderColor=css("--line");
+  Chart.defaults.plugins.legend.labels.usePointStyle=true; Chart.defaults.plugins.legend.labels.boxWidth=8;
+  Chart.defaults.maintainAspectRatio=false;
+}
+const group=(arr,key,val)=>{const m=new Map();arr.forEach(d=>m.set(d[key],(m.get(d[key])||0)+val(d)));return [...m.entries()]};
+const byMonth=arr=>{const m={};arr.forEach(d=>{const o=m[d.mes]||(m[d.mes]={v:0,c:0,g:0,u:0});o.v+=d.ventas;o.c+=d.costo;o.g+=d.gastos;o.u+=d.utilidad});return Object.keys(m).sort().map(k=>[k,m[k]])};
+const moneyTip={callbacks:{label:c=>`${c.dataset.label?c.dataset.label+": ":""}${money(c.parsed.y??c.parsed)}`}};
+const legendHTML=(id,labels,colors)=>$(id).innerHTML=labels.map((l,i)=>`<span><i style="background:${colors[i%colors.length]}"></i>${esc(l)}</span>`).join("");
+function hbar(id,entries){
+  chart(id,{type:"bar",data:{labels:entries.map(e=>e[0]),datasets:[{data:entries.map(e=>e[1]),backgroundColor:entries.map((_,i)=>PAL[i%PAL.length]),borderRadius:8,maxBarThickness:22}]},
+    options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>money(c.parsed.x)}}},
+      scales:{x:{ticks:{callback:v=>short(v)},grid:{color:css("--line")}},y:{grid:{display:false},ticks:{autoSkip:false,font:{size:11},callback(v){const l=this.getLabelForValue(v);return l.length>18?l.slice(0,17)+"…":l}}}}}});
+}
+
+/* ================= Cabecera ================= */
+function renderHero(){
+  const v=sum(DATA,d=>d.ventas), u=sum(DATA,d=>d.utilidad);
+  $("bigLabel").textContent = F.anio?`Ventas ${F.anio}`:"Ventas totales";
+  $("bigValue").textContent = money(v);
+  const years=[...new Set(DATA.map(d=>d.anio))].sort(); let sub=`<span>Utilidad ${money(u)} (${pct(v?u/v*100:0)})</span>`;
+  if(years.length>=2){ const a=years.at(-2), b=years.at(-1), va=sum(DATA.filter(d=>d.anio===a),d=>d.ventas), vb=sum(DATA.filter(d=>d.anio===b),d=>d.ventas);
+    if(va){ const g=(vb-va)/va*100; sub+=`<span class="pill ${g>=0?"up":"dn"}">${g>=0?"▲":"▼"} ${Math.abs(g).toFixed(1)}% ${b} vs ${a}</span>`; } }
+  $("bigSub").innerHTML=sub;
+  setDefaults(); const m=byMonth(DATA);
+  chart("spark",{type:"line",data:{labels:m.map(x=>x[0]),datasets:[{data:m.map(x=>x[1].v),borderColor:"#FFC21A",borderWidth:2.5,pointRadius:0,tension:.35,fill:true,
+    backgroundColor:c=>{const g=c.chart.ctx.createLinearGradient(0,0,0,80);g.addColorStop(0,"rgba(255,194,26,.45)");g.addColorStop(1,"rgba(255,194,26,0)");return g}}]},
+    options:{animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false}}}});
+}
+
+/* ================= Vistas ================= */
+function renderView(v){
+  if(!dirty.has(v)) return; dirty.delete(v); setDefaults();
+  ({resumen,productos,mercado,registros})[v]();
+}
+
+function resumen(){
+  const v=sum(DATA,d=>d.ventas),u=sum(DATA,d=>d.utilidad),mg=sum(DATA,d=>d.margen),c=sum(DATA,d=>d.costo),g=sum(DATA,d=>d.gastos),n=DATA.length;
+  const k=[["Ventas",money(v),`${n.toLocaleString(CFG.locale)} operaciones`,"--violet"],["Utilidad",money(u),`${pct(v?u/v*100:0)} sobre ventas`,"--green"],
+    ["Margen",money(mg),`${pct(v?mg/v*100:0)} de margen`,"--blue"],["Costos",money(c),`${pct(v?c/v*100:0)} de las ventas`,"--orange"],
+    ["Gastos",money(g),`${pct(v?g/v*100:0)} de las ventas`,"--magenta"],["Ticket promedio",money(n?v/n:0),"por operación","--cyan"],
+    ["ROI",pct(c?u/c*100:0),"utilidad sobre costo","--red"],["Operaciones",n.toLocaleString(CFG.locale),"registros filtrados","--yellow"]];
+  $("kpis").innerHTML=k.map(x=>`<div class="kpi" style="--c:var(${x[3]})"><div class="k">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div></div>`).join("");
+
+  const m=byMonth(DATA), labels=m.map(x=>mLabel(x[0]));
+  chart("cTendencia",{type:"line",data:{labels,datasets:[
+    {label:"Ventas",data:m.map(x=>x[1].v),borderColor:"#5A1EF5",backgroundColor:"rgba(90,30,245,.15)",fill:true,tension:.35,borderWidth:3,pointRadius:2},
+    {label:"Utilidad",data:m.map(x=>x[1].u),borderColor:"#0FBF73",backgroundColor:"rgba(15,191,115,.15)",fill:true,tension:.35,borderWidth:3,pointRadius:2}]},
+    options:{interaction:{mode:"index",intersect:false},plugins:{tooltip:moneyTip},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,maxRotation:0}},y:{ticks:{callback:v=>short(v)}}}}});
+  chart("cComparativo",{type:"bar",data:{labels,datasets:[
+    {label:"Ventas",data:m.map(x=>x[1].v),backgroundColor:"#5A1EF5",borderRadius:4},
+    {label:"Costo",data:m.map(x=>x[1].c),backgroundColor:"#FF7A1A",borderRadius:4},
+    {label:"Utilidad",data:m.map(x=>x[1].u),backgroundColor:"#0FBF73",borderRadius:4}]},
+    options:{plugins:{tooltip:moneyTip},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,maxRotation:0}},y:{ticks:{callback:v=>short(v)}}}}});
+  const est=[["Costos",c],["Gastos",g],["Utilidad",Math.max(0,u)]], ec=["#FF7A1A","#FF2D87","#0FBF73"];
+  chart("cEstructura",{type:"doughnut",data:{labels:est.map(e=>e[0]),datasets:[{data:est.map(e=>e[1]),backgroundColor:ec,borderColor:css("--card"),borderWidth:4}]},
+    options:{cutout:"64%",plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>`${x.label}: ${money(x.parsed)} (${pct(v?x.parsed/v*100:0)})`}}}}});
+  legendHTML("lEstructura",est.map(e=>`${e[0]} ${pct(v?e[1]/v*100:0)}`),ec);
+}
+
+function productos(){
+  const prods=group(DATA,"producto",d=>d.ventas).sort((a,b)=>b[1]-a[1]);
+  hbar("cProductos",prods.slice(0,10));
+  const cats=group(DATA,"categoria",d=>d.ventas).sort((a,b)=>b[1]-a[1]), tot=sum(cats,c=>c[1]);
+  chart("cCategorias",{type:"doughnut",data:{labels:cats.map(c=>c[0]),datasets:[{data:cats.map(c=>c[1]),backgroundColor:PAL,borderColor:css("--card"),borderWidth:4}]},
+    options:{cutout:"62%",plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>`${x.label}: ${money(x.parsed)} (${pct(tot?x.parsed/tot*100:0)})`}}}}});
+  legendHTML("lCategorias",cats.map(c=>`${c[0]} ${pct(tot?c[1]/tot*100:0)}`),PAL);
+
+  // Rentabilidad
+  const pm={}; DATA.forEach(d=>{const o=pm[d.producto]||(pm[d.producto]={v:0,mg:0,u:0});o.v+=d.ventas;o.mg+=d.margen;o.u+=d.utilidad});
+  const pe=Object.entries(pm), maxV=Math.max(1,...pe.map(p=>p[1].v));
+  chart("cRentabilidad",{type:"bubble",data:{datasets:pe.map(([n,o],i)=>({label:n,data:[{x:o.v?o.mg/o.v*100:0,y:o.v?o.u/o.v*100:0,r:8+Math.sqrt(o.v/maxV)*16}],
+      backgroundColor:PAL[i%PAL.length]+"CC",borderColor:PAL[i%PAL.length],borderWidth:2}))},
+    options:{plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>`${c.dataset.label}: margen ${pct(c.parsed.x)}, utilidad ${pct(c.parsed.y)}`}}},
+      scales:{x:{title:{display:true,text:"% margen"},ticks:{callback:v=>v+"%"}},y:{title:{display:true,text:"% utilidad"},ticks:{callback:v=>v+"%"}}}}});
+
+  // BCG
+  const years=[...new Set(DATA.map(d=>d.anio))].sort(), a=years.at(-2), b=years.at(-1);
+  const bm={}; DATA.forEach(d=>{const o=bm[d.producto]||(bm[d.producto]={t:0,a:0,b:0});o.t+=d.ventas;if(d.anio===a)o.a+=d.ventas;if(d.anio===b)o.b+=d.ventas});
+  const be=Object.entries(bm), lider=Math.max(1,...be.map(x=>x[1].t)), maxT=lider;
+  const ta=sum(be,x=>x[1].a), tb=sum(be,x=>x[1].b), gMarket=ta?(tb-ta)/ta*100:0;
+  $("bcgSub").textContent = a&&b ? `Crecimiento ${b} frente a ${a} y participación relativa al líder. Línea horizontal: crecimiento del mercado (${pct(gMarket)})` : "Se necesitan al menos dos años de datos para calcular el crecimiento";
+  const qColor=(x,y)=>y>=gMarket?(x>=50?"#FF7A1A":"#2F6BFF"):(x>=50?"#0FBF73":"#FF2D87");
+  const pts=be.map(([n,o])=>({n,x:o.t/lider*100,y:o.a?(o.b-o.a)/o.a*100:0,r:9+Math.sqrt(o.t/maxT)*18}));
+  const quadPlugin={id:"quad",beforeDatasetsDraw(c){const {ctx,chartArea:ca,scales:{x,y}}=c;const px=x.getPixelForValue(50),py=y.getPixelForValue(gMarket);
+    ctx.save();[["rgba(255,122,26,.12)",px,ca.top,ca.right-px,py-ca.top],["rgba(47,107,255,.12)",ca.left,ca.top,px-ca.left,py-ca.top],
+      ["rgba(15,191,115,.12)",px,py,ca.right-px,ca.bottom-py],["rgba(255,45,135,.12)",ca.left,py,px-ca.left,ca.bottom-py]].forEach(([f,...r])=>{ctx.fillStyle=f;ctx.fillRect(...r)});
+    ctx.strokeStyle=css("--muted");ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(px,ca.top);ctx.lineTo(px,ca.bottom);ctx.moveTo(ca.left,py);ctx.lineTo(ca.right,py);ctx.stroke();ctx.restore();}};
+  const labelPlugin={id:"bl",afterDatasetsDraw(c){const {ctx}=c;ctx.save();ctx.font="600 11px "+getComputedStyle(document.body).fontFamily;ctx.fillStyle=css("--ink");ctx.textAlign="center";
+    c.getDatasetMeta(0).data.forEach((el,i)=>{const n=pts[i].n;ctx.fillText(n.length>14?n.slice(0,13)+"…":n,el.x,el.y-pts[i].r-5)});ctx.restore();}};
+  const ys=pts.map(p=>p.y), pad=Math.max(10,(Math.max(...ys,gMarket)-Math.min(...ys,gMarket))*.25);
+  chart("cBCG",{type:"bubble",plugins:[quadPlugin,labelPlugin],data:{datasets:[{data:pts,backgroundColor:pts.map(p=>qColor(p.x,p.y)+"DD"),borderColor:"#fff",borderWidth:2}]},
+    options:{layout:{padding:{top:16}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const p=pts[c.dataIndex];return `${p.n}: crecimiento ${pct(p.y)}, participación ${pct(p.x)}, ventas ${money(bm[p.n].t)}`}}}},
+      scales:{x:{min:0,max:110,reverse:false,title:{display:true,text:"Participación relativa al líder (%)"},grid:{display:false}},
+              y:{min:Math.floor(Math.min(...ys,gMarket)-pad),max:Math.ceil(Math.max(...ys,gMarket)+pad),title:{display:true,text:"Crecimiento anual (%)"},grid:{display:false},ticks:{callback:v=>v+"%"}}}}});
+
+  // Radar
+  const cn=[...new Set(DATA.map(d=>d.categoria))];
+  const raw=cn.map(c=>{const a=DATA.filter(d=>d.categoria===c),v=sum(a,d=>d.ventas);return [v,sum(a,d=>d.utilidad),sum(a,d=>d.margen),v?sum(a,d=>d.margen)/v*100:0,v?sum(a,d=>d.utilidad)/v*100:0,a.length]});
+  const mx=[0,1,2,3,4,5].map(i=>Math.max(...raw.map(r=>r[i]),0)||1);
+  chart("cRadar",{type:"radar",data:{labels:["Ventas","Utilidad","Margen","% margen","% utilidad","Operaciones"],
+    datasets:cn.map((c,i)=>({label:c,data:raw[i].map((x,j)=>Math.max(0,x/mx[j]*100)),borderColor:PAL[i%PAL.length],backgroundColor:PAL[i%PAL.length]+"33",borderWidth:2.5,pointRadius:3,pointBackgroundColor:PAL[i%PAL.length]}))},
+    options:{plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.r.toFixed(0)}`}}},
+      scales:{r:{min:0,max:100,ticks:{display:false,stepSize:25},grid:{color:css("--line")},angleLines:{color:css("--line")},pointLabels:{font:{size:11,weight:"600"},color:css("--ink")}}}}});
+}
+
+function mercado(){
+  hbar("cRegiones",group(DATA,"region",d=>d.ventas).sort((a,b)=>b[1]-a[1]).slice(0,10));
+  hbar("cEmpresas",group(DATA,"empresa",d=>d.ventas).sort((a,b)=>b[1]-a[1]).slice(0,10));
+  const cats=[...new Set(DATA.map(d=>d.categoria))];
+  chart("cDispersion",{type:"scatter",data:{datasets:cats.map((c,i)=>({label:c,data:DATA.filter(d=>d.categoria===c).map(d=>({x:d.ventas,y:d.utilidad})),backgroundColor:PAL[i%PAL.length]+"B3",pointRadius:3.5,pointHoverRadius:6}))},
+    options:{plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>`${c.dataset.label}: venta ${money(c.parsed.x)}, utilidad ${money(c.parsed.y)}`}}},
+      scales:{x:{title:{display:true,text:"Venta"},ticks:{callback:v=>short(v)}},y:{title:{display:true,text:"Utilidad"},ticks:{callback:v=>short(v)}}}}});
+
+  // Gauss con exclusión de valores atípicos (regla IQR)
+  const all=DATA.map(d=>d.ventas).sort((a,b)=>a-b);
+  if(!all.length){ if(charts.cGauss) charts.cGauss.destroy(); return; }
+  const q=p=>all[Math.min(all.length-1,Math.floor(p*(all.length-1)))], iqr=q(.75)-q(.25), lo=q(.25)-3*iqr, hi=q(.75)+3*iqr;
+  const vals=all.filter(x=>x>=lo&&x<=hi), out=all.length-vals.length;
+  const mean=sum(vals,x=>x)/vals.length, sd=Math.sqrt(sum(vals,x=>(x-mean)**2)/vals.length)||1;
+  const mn=vals[0], mxv=vals.at(-1), bins=Math.min(24,Math.max(6,Math.round(Math.sqrt(vals.length)))), w=(mxv-mn)/bins||1, hist=new Array(bins).fill(0);
+  vals.forEach(x=>hist[Math.min(bins-1,Math.floor((x-mn)/w))]++);
+  const labels=hist.map((_,i)=>short(mn+w*(i+.5))), curve=hist.map((_,i)=>{const x=mn+w*(i+.5);return Math.exp(-.5*((x-mean)/sd)**2)/(sd*Math.sqrt(2*Math.PI))*vals.length*w});
+  $("gaussSub").textContent=`Media ${money(mean)}, desviación ${money(sd)}, n = ${vals.length}`+(out?`. ${out} valor${out>1?"es":""} atípico${out>1?"s":""} excluido${out>1?"s":""}`:"");
+  chart("cGauss",{type:"bar",data:{labels,datasets:[
+    {type:"line",label:"Curva normal",data:curve,borderColor:"#FF2D87",backgroundColor:"rgba(255,45,135,.15)",fill:true,tension:.4,pointRadius:0,borderWidth:3,order:1},
+    {type:"bar",label:"Frecuencia",data:hist,backgroundColor:"#00B8D9",borderRadius:4,order:2}]},
+    options:{plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y.toFixed(c.datasetIndex?0:1)}`}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,maxRotation:0}},y:{beginAtZero:true}}}});
+}
+
+function registros(){
+  const qv=$("search").value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+  const list=DATA.filter(d=>!qv||(d.empresa+" "+d.producto+" "+d.region+" "+d.categoria).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").includes(qv))
+    .sort((a,b)=>b.f-a.f);
+  $("count").textContent=`${list.length.toLocaleString(CFG.locale)} operaciones${list.length>150?". Se muestran las 150 más recientes":""}`;
+  $("rows").innerHTML=list.slice(0,150).map(d=>`<li><div><div class="t">${esc(d.producto)}</div>
+    <div class="d">${esc(d.empresa)}, ${esc(d.region)}<br>${new Date(d.fecha+"T12:00:00Z").toLocaleDateString(CFG.locale,{day:"numeric",month:"short",year:"numeric"})}</div></div>
+    <div class="r"><div class="m">${money(d.ventas)}</div><div class="u ${d.utilidad>=0?"pos":"neg"}">${d.utilidad>=0?"+":""}${money(d.utilidad)}</div></div></li>`).join("")
+    || `<li class="empty">No hay operaciones que coincidan. Cambia la búsqueda o quita filtros.</li>`;
+}
+
+/* ================= Navegación ================= */
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
+  current=b.dataset.view;
+  document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",String(x===b)));
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+current));
+  window.scrollTo({top:0}); renderView(current);
+});
+$("search").addEventListener("input",()=>{dirty.add("registros");renderView("registros")});
+$("refreshBtn").onclick=load;
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&CFG.sheetCsvUrl) load(); });
+if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+load();
+</script>
+</body>
+</html>
