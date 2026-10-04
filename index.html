@@ -10,8 +10,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Dashboard">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -202,10 +202,12 @@ const CONFIG = {
   titulo: "Mi Dashboard",
   // Pega aquí el enlace CSV de tu Google Sheet publicada.
   // Vacío = el dashboard muestra datos de ejemplo.
-  sheetCsvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZ7WHoXovpWi4LGdj8eUIurPcTE1j22vZ-PSEpXZZJsX07OCAvBPVvI5V4V3YKily4dmL9Z07fUpuz/pub?output=csv",
+  sheetCsvUrl: "",
   moneda: "PEN",          // PEN, USD, EUR...
   locale: "es-PE",
-  periodoInicial: 30      // 7, 30, 90 o 0 (todo)
+  periodoInicial: 30,     // 7, 30, 90 o 0 (todo)
+  // Nombres exactos de tus columnas (fila 1). Vacío = detección automática.
+  columnas: { fecha: "", categoria: "", monto: "", meta: "", detalle: "" }
 };
 /* ========================================================= */
 
@@ -242,19 +244,33 @@ function parseDate(s){
 }
 function parseNum(s){
   if(!s) return 0;
-  s=String(s).replace(/[^\d,.\-]/g,"");
+  s=String(s).trim().replace(/^[^\d\-]+/,"").replace(/[^\d,.\-]/g,"");
   if(s.includes(",")&&s.includes(".")) s = s.lastIndexOf(",")>s.lastIndexOf(".") ? s.replace(/\./g,"").replace(",",".") : s.replace(/,/g,"");
   else if(s.includes(",")) s = /,\d{1,2}$/.test(s) ? s.replace(",",".") : s.replace(/,/g,"");
   return parseFloat(s)||0;
 }
+const SINONIMOS = {
+  fecha:["fecha","date","dia","periodo"],
+  categoria:["categoria","producto","tipo","linea","rubro","familia","servicio","category","product"],
+  monto:["monto","venta total","ventas","venta","total","importe","ingreso","facturacion","revenue","sales","precio"],
+  meta:["meta","objetivo","presupuesto","target"],
+  detalle:["detalle","cliente","vendedor","descripcion","nombre","responsable"]
+};
+function findCol(h,key,used){
+  const fixed=CONFIG.columnas&&CONFIG.columnas[key];
+  if(fixed) return h.indexOf(norm(fixed));
+  for(const syn of SINONIMOS[key]){ const i=h.findIndex((x,j)=>x===syn&&!used.has(j)); if(i>=0) return i; }
+  for(const syn of SINONIMOS[key]){ const i=h.findIndex((x,j)=>x.includes(syn)&&!used.has(j)); if(i>=0) return i; }
+  return -1;
+}
 function rowsToData(rows){
-  const h=rows[0].map(norm);
-  const idx=k=>h.findIndex(x=>x===k);
-  const iF=idx("fecha"), iC=idx("categoria"), iM=idx("monto"), iMe=idx("meta"), iD=idx("detalle");
-  if(iF<0||iC<0||iM<0) throw new Error("La hoja necesita las columnas fecha, categoria y monto en la primera fila.");
+  const h=rows[0].map(norm), used=new Set(), col={};
+  for(const k of ["fecha","monto","meta","categoria","detalle"]){ col[k]=findCol(h,k,used); if(col[k]>=0) used.add(col[k]); }
+  const falta=["fecha","categoria","monto"].filter(k=>col[k]<0);
+  if(falta.length) throw new Error(`No encontré la columna de ${falta.join(", ")}. Columnas de tu hoja: ${rows[0].map(x=>x.trim()).filter(Boolean).join(", ")}. Escribe el nombre exacto en CONFIG.columnas dentro de index.html.`);
   return rows.slice(1).map(r=>({
-    fecha:parseDate(r[iF]||""), categoria:(r[iC]||"Sin categoría").trim(),
-    monto:parseNum(r[iM]), meta:iMe>=0?parseNum(r[iMe]):0, detalle:iD>=0?(r[iD]||"").trim():""
+    fecha:parseDate(r[col.fecha]||""), categoria:(r[col.categoria]||"Sin categoría").trim()||"Sin categoría",
+    monto:parseNum(r[col.monto]), meta:col.meta>=0?parseNum(r[col.meta]):0, detalle:col.detalle>=0?(r[col.detalle]||"").trim():""
   })).filter(x=>x.fecha);
 }
 
